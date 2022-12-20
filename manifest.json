@@ -1,0 +1,35 @@
+{
+    "Actions": [
+        {
+            "Icon": "actionIcon",
+            "Name": "Test",
+            "States": [
+                {
+                    "Image": "actionDefaultImage",
+                    "TitleAlignment": "middle",
+                    "FontSize": "16"
+                }
+            ],
+            "SupportedInMultiActions": false,
+            "Tooltip": "How many times did you get pwned today? Keep track with this counter.",
+            "UUID": "com.bocktown.motu.mute"
+        }
+    ],
+    "SDKVersion": 2,
+    "Author": "BockTown",
+    "CodePath": "app.html",
+    "Description": "Lets you control your MOTU device",
+    "Name": "MOTU",
+    "Icon": "pluginIcon",
+    "URL": "https://example.com/todo",
+    "Version": "1.0.0",
+    "OS": [
+        {
+            "Platform": "windows",
+            "MinimumVersion": "10"
+        }
+    ],
+    "Software": {
+        "MinimumVersion": "5.0"
+    }
+}
