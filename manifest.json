@@ -1,17 +1,17 @@
 {
     "Actions": [
         {
-            "Icon": "actionIcon",
-            "Name": "Test",
+            "Icon": "mute",
+            "Name": "Mute",
             "States": [
                 {
-                    "Image": "actionDefaultImage",
-                    "TitleAlignment": "middle",
-                    "FontSize": "16"
+                    "Image": "mute",
+                    "TitleAlignment": "bottom",
+                    "FontSize": "12"
                 }
             ],
             "SupportedInMultiActions": false,
-            "Tooltip": "How many times did you get pwned today? Keep track with this counter.",
+            "Tooltip": "Mute a mixer channel",
             "UUID": "com.bocktown.motu.mute"
         }
     ],
@@ -20,7 +20,7 @@
     "CodePath": "app.html",
     "Description": "Lets you control your MOTU device",
     "Name": "MOTU",
-    "Icon": "pluginIcon",
+    "Icon": "icon",
     "URL": "https://example.com/todo",
     "Version": "1.0.0",
     "OS": [

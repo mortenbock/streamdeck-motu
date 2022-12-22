@@ -1,0 +1,8 @@
+
+Endpoint for getting devices:
+http://localhost:1280/connected_devices
+
+Random id:
+
+Math.floor(Math.random()*(Math.pow(2,31)-1))
+
