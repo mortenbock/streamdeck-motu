@@ -1,6 +1,13 @@
 var websocket;
 
 const motuBaseUrl = 'http://localhost:1280';
+
+const motuApiSettings = {
+  host: 'localhost',
+  port: '1280',
+  deviceLists: {}
+}
+
 // Generate random client id on startup
 const motuClientId = Math.floor(Math.random() * (Math.pow(2, 31) - 1));
 const deviceDataStores = {};
@@ -29,7 +36,7 @@ async function longPollDevice(deviceId) {
     // Status 304: Nothing changed. Keep polling
     // Others, log error and keep polling (Maybe back off?)
 
-    if(dataStoreUpdateResponse.status === 200){
+    if (dataStoreUpdateResponse.status === 200) {
       etag = dataStoreUpdateResponse.headers.get('ETag');
       const dataStoreUpdate = await dataStoreUpdateResponse.json();
       Object.assign(deviceDataStores[deviceId], dataStoreUpdate);
@@ -52,6 +59,36 @@ async function setupDevicePolling() {
   }
 }
 
+async function getMotuDevices(eventData){
+
+  const deviceCacheKey = `${motuApiSettings.host}_${motuApiSettings.port}`
+  let deviceArray = motuApiSettings.deviceLists[deviceCacheKey];
+  if(eventData.payload.isRefresh || deviceArray === undefined || deviceArray.length < 1) {
+    const res = await fetch(`http://${motuApiSettings.host}:${motuApiSettings.port}/connected_devices`);
+    deviceArray = await res.json();
+    motuApiSettings.deviceLists[deviceCacheKey] = deviceArray;
+  }
+
+  const piItems = [];
+  for (let index = 0; index < deviceArray.length; index++) {
+    const element = deviceArray[index];
+    piItems.push({ label: element.uid, value: element.uid });
+  }
+
+  console.log('piItems', piItems);
+
+  const respEvent = {
+    action: eventData.action,
+    event: 'sendToPropertyInspector',
+    context: eventData.context,
+    payload: {
+      event: 'getMotuDevices',
+      items: piItems
+    }
+  };
+
+  websocket.send(JSON.stringify(respEvent));
+}
 
 /**
  * connectElgatoStreamDeckSocket
@@ -68,39 +105,48 @@ function connectElgatoStreamDeckSocket(port, uuid, messageType, appInfoString, a
 
   websocket.onmessage = function (evt) {
     let eventData = JSON.parse(evt.data);
-    switch (eventData.action) {
-      case 'com.bocktown.motu.mute':
-        let eventType = eventData.event;
-        switch (eventType) {
-          case 'keyDown':
-            const formData = new URLSearchParams();
 
-            const muteCmd = JSON.stringify({ 'mix/chan/0/matrix/mute': 1 });
-            formData.append('json', muteCmd);
+    switch (eventData.event) {
+      case 'didReceiveGlobalSettings':
+        console.log('didReceiveGlobalSettings', eventData);
+        const host = eventData?.payload?.settings?.motuapi?.host;
+        motuApiSettings.host = host && host !== '' ? host : 'localhost';
+        const port = eventData?.payload?.settings?.motuapi?.port
+        motuApiSettings.port = port && port !== '' ? port : '1280';
 
-            fetch('http://localhost:1280/0001f2fffe00bd94/datastore?client=1420185306', {
-              'body': formData,
-              'method': 'POST'
-            });
-
-            var updateEvt = {
-              'event': 'setTitle',
-              'context': eventData.context,
-              'payload': {
-                'title': 'Chan 0'
-              }
-            };
-
-            websocket.send(JSON.stringify(updateEvt));
-
-            break;
-
-          default:
-            break;
+        console.log('settingsUpdated', motuApiSettings);
+        break;
+      case 'sendToPlugin':
+        console.log('sendToPlugin', eventData);
+        if (eventData.payload && eventData.payload.event === 'getMotuDevices') {
+          getMotuDevices(eventData);
         }
         break;
+      case 'keyDown':
+        if (eventData.action === 'com.bocktown.motu.mute') {
+          const formData = new URLSearchParams();
 
+          const muteCmd = JSON.stringify({ 'mix/chan/0/matrix/mute': 1 });
+          formData.append('json', muteCmd);
+
+          fetch('http://localhost:1280/0001f2fffe00bd94/datastore?client=1420185306', {
+            'body': formData,
+            'method': 'POST'
+          });
+
+          var updateEvt = {
+            'event': 'setTitle',
+            'context': eventData.context,
+            'payload': {
+              'title': 'Chan 0'
+            }
+          };
+
+          websocket.send(JSON.stringify(updateEvt));
+        }
+        break;
       default:
+        console.log(eventData);
         break;
     }
   }

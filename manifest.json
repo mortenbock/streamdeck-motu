@@ -12,7 +12,8 @@
             ],
             "SupportedInMultiActions": false,
             "Tooltip": "Mute a mixer channel",
-            "UUID": "com.bocktown.motu.mute"
+            "UUID": "com.bocktown.motu.mute",
+            "PropertyInspectorPath": "pi/pi.html"
         }
     ],
     "SDKVersion": 2,
