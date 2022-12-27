@@ -75,8 +75,6 @@ async function getMotuDevices(eventData) {
     piItems.push({ label: element.uid, value: element.uid });
   }
 
-  console.log('piItems', piItems);
-
   const respEvent = {
     action: eventData.action,
     event: 'sendToPropertyInspector',
@@ -122,7 +120,6 @@ function connectElgatoStreamDeckSocket(port, uuid, messageType, appInfoString, a
         const device = eventData?.payload?.settings?.motuapi?.device
         motuApiSettings.device = device;
 
-        console.log('settingsUpdated', motuApiSettings);
         break;
       case 'sendToPlugin':
         console.log('sendToPlugin', eventData);
@@ -134,23 +131,16 @@ function connectElgatoStreamDeckSocket(port, uuid, messageType, appInfoString, a
         if (eventData.action === 'com.bocktown.motu.mute') {
           const formData = new URLSearchParams();
 
-          const muteCmd = JSON.stringify({ 'mix/chan/0/matrix/mute': 1 });
-          formData.append('json', muteCmd);
+          const reqObj = {};
+          reqObj[`mix/chan/${eventData.payload.settings.mixerChannelIndex}/matrix/mute`] = 1;
 
-          fetch('http://localhost:1280/0001f2fffe00bd94/datastore?client=1420185306', {
+          const muteCmd = JSON.stringify(reqObj);
+          formData.append('json', muteCmd);
+          
+          fetch(`http://${motuApiSettings.host}:${motuApiSettings.port}/${motuApiSettings.device}/datastore?client=${motuClientId}`, {
             'body': formData,
             'method': 'POST'
           });
-
-          var updateEvt = {
-            'event': 'setTitle',
-            'context': eventData.context,
-            'payload': {
-              'title': 'Chan 0'
-            }
-          };
-
-          websocket.send(JSON.stringify(updateEvt));
         }
         break;
       default:
@@ -171,5 +161,4 @@ function connectElgatoStreamDeckSocket(port, uuid, messageType, appInfoString, a
 
   pollWorker();
 
-  console.log('After long poll call');
 }
