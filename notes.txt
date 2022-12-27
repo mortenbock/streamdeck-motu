@@ -8,3 +8,23 @@ Math.floor(Math.random()*(Math.pow(2,31)-1))
 
 Use this for Prop Inspectors:
 https://sdpi-components.dev/
+
+
+
+
+// Contains the format of the channel mono/stereo
+mix/chan/5/config/format: "2:1"
+
+"1:0" => mono
+"2:0" => stereo left
+"2:1" => stereo right
+
+
+// The name of a channel
+ext/obank/6/ch/0/defaultName: "In 1"
+ext/obank/6/ch/0/name: "NT2-A"
+ext/obank/6/ch/0/src: "0:0"
+
+ext/obank/6/ch/4/defaultName: "In 5"
+ext/obank/6/ch/4/name: "From System L"
+ext/obank/6/ch/4/src: "4:0"
