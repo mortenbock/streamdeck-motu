@@ -6,3 +6,5 @@ Random id:
 
 Math.floor(Math.random()*(Math.pow(2,31)-1))
 
+Use this for Prop Inspectors:
+https://sdpi-components.dev/
