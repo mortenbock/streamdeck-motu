@@ -16,6 +16,9 @@ const motuClientId = Math.floor(Math.random() * (Math.pow(2, 31) - 1));
 // Cached datastores for the known devices
 const deviceDataStores = {};
 
+// Known actions that need to be updated
+const registeredActions = new Map();
+
 // Utility to allow an async function to sleep. Used like: await sleep(1000)
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -51,6 +54,8 @@ async function pollWorker() {
         } else {
           Object.assign(deviceDataStores[dataStoreEndpoint], dataStorePayload);
         }
+
+        updateActions();
       }
     } catch (error) {
       console.error('Error while fetching datastore', error);
@@ -88,6 +93,43 @@ async function getMotuDevices(eventData) {
   websocket.send(JSON.stringify(respEvent));
 }
 
+async function updateActions() {
+  for (const action of registeredActions.values()) {
+    updateAction(action);
+  }
+}
+
+async function updateAction(eventData) {
+  if (eventData.action === 'com.bocktown.motu.mute') {
+    const channelIndex = eventData?.payload?.settings?.mixerChannelIndex;
+    let actionTitle = '?';
+    if (channelIndex === undefined || channelIndex === null || channelIndex === '') {
+      actionTitle = 'N/A'
+    } else {
+      const dataStoreEndpoint = `http://${motuApiSettings.host}:${motuApiSettings.port}/${motuApiSettings.device}/datastore?client=${motuClientId}`;
+      const dataStore = deviceDataStores[dataStoreEndpoint];
+      if (!dataStore) return;
+      const name = dataStore[`ext/obank/6/ch/${channelIndex}/name`];
+      if (name?.length > 0) {
+        actionTitle = name;
+      } else {
+        const defaultName = dataStore[`ext/obank/6/ch/${channelIndex}/defaultName`];
+        actionTitle = defaultName;
+      }
+    }
+
+    const setTitleCmd = {
+      'event': 'setTitle',
+      'context': eventData.context,
+      'payload': {
+        'title': actionTitle
+      }
+    };
+
+    websocket.send(JSON.stringify(setTitleCmd));
+  }
+}
+
 /**
  * connectElgatoStreamDeckSocket
  * This is the first function StreamDeck Software calls, when
@@ -103,13 +145,12 @@ function connectElgatoStreamDeckSocket(port, uuid, messageType, appInfoString, a
 
   websocket.onmessage = function (evt) {
     let eventData = JSON.parse(evt.data);
-
     switch (eventData.event) {
       case 'deviceDidConnect':
         websocket.send(JSON.stringify({ 'event': 'getGlobalSettings', 'context': uuid }));
         break;
       case 'didReceiveGlobalSettings':
-        console.log('didReceiveGlobalSettings', eventData);
+        //console.log('didReceiveGlobalSettings', eventData);
 
         const host = eventData?.payload?.settings?.motuapi?.host;
         motuApiSettings.host = host && host !== '' ? host : 'localhost';
@@ -122,42 +163,17 @@ function connectElgatoStreamDeckSocket(port, uuid, messageType, appInfoString, a
 
         break;
       case 'sendToPlugin':
-        console.log('sendToPlugin', eventData);
         if (eventData.payload && eventData.payload.event === 'getMotuDevices') {
           getMotuDevices(eventData);
         }
         break;
       case 'willAppear':
       case 'didReceiveSettings':
-        if (eventData.action === 'com.bocktown.motu.mute') {
-          const channelIndex = eventData?.payload?.settings?.mixerChannelIndex;
-          let actionTitle = '?';
-          if (channelIndex === undefined || channelIndex === null || channelIndex === '') {
-            actionTitle = 'N/A'
-          } else {
-            const dataStoreEndpoint = `http://${motuApiSettings.host}:${motuApiSettings.port}/${motuApiSettings.device}/datastore?client=${motuClientId}`;
-            const dataStore = deviceDataStores[dataStoreEndpoint];
-            if (!dataStore) break;
-            const name = dataStore[`ext/obank/6/ch/${channelIndex}/name`];
-            if (name?.length > 0) {
-              actionTitle = name;
-            } else {
-              const defaultName = dataStore[`ext/obank/6/ch/${channelIndex}/defaultName`];
-              actionTitle = defaultName;
-            }
-          }
-
-          const setTitleCmd = {
-            'event': 'setTitle',
-            'context': eventData.context,
-            'payload': {
-              'title': actionTitle
-            }
-          };
-
-          websocket.send(JSON.stringify(setTitleCmd));
-
-        }
+        registeredActions.set(eventData.context, eventData);
+        updateAction(eventData);
+        break;
+      case 'willDisappear':
+        registeredActions.delete(eventData.context);
         break;
       case 'keyDown':
         if (eventData.action === 'com.bocktown.motu.mute') {
@@ -182,7 +198,7 @@ function connectElgatoStreamDeckSocket(port, uuid, messageType, appInfoString, a
         }
         break;
       default:
-        console.log(eventData);
+        //console.log(eventData);
         break;
     }
   }
