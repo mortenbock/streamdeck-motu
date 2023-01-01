@@ -35,10 +35,11 @@
   <fieldset>
     <legend>Mute settings</legend>
     <sdpi-item label="Mixer Channel">
-      <sdpi-textfield
-          setting="mixerChannelIndex"
-          required>
-      </sdpi-textfield>
+      <sdpi-select setting="mixerChannelIndex" placeholder="Please select channel"
+        datasource="getChannels" 
+        loading="Fetching channels..." 
+        show-refresh="true" 
+        hot-reload="true"></sdpi-select>
   </sdpi-item>
   </fieldset>
 </body>

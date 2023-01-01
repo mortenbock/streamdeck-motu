@@ -93,6 +93,49 @@ async function getMotuDevices(eventData) {
   websocket.send(JSON.stringify(respEvent));
 }
 
+/**
+ * getChannels
+ * Get list of channels to be selected by the user
+ */
+async function getChannels(eventData) {
+  console.log('getChannels', eventData);
+  const dataStoreEndpoint = `http://${motuApiSettings.host}:${motuApiSettings.port}/${motuApiSettings.device}/datastore?client=${motuClientId}`;
+  const dataStore = deviceDataStores[dataStoreEndpoint];
+
+  const piItems = [];
+
+  if (dataStore) {
+    for (const objKey of Object.keys(dataStore)) {
+      const expr = /^ext\/obank\/6\/ch\/(\d+)\/defaultName$/;
+      const match = expr.exec(objKey);
+      if (match?.length > 0) {
+        const channelIndex = match[1];
+        const routingSource = dataStore[`ext/obank/6/ch/${channelIndex}/src`];
+        if (routingSource) {
+          const chFormat = dataStore[`mix/chan/${channelIndex}/config/format`];
+          if (chFormat === '1:0' || chFormat === '2:0') {
+            const chName = getChannelDisplayName(dataStore, channelIndex);
+            piItems.push({ label: chName, value: channelIndex });
+          }
+        }
+      }
+    }
+  }
+
+  const respEvent = {
+    action: eventData.action,
+    event: 'sendToPropertyInspector',
+    context: eventData.context,
+    payload: {
+      event: 'getChannels',
+      items: piItems
+    }
+  };
+
+  websocket.send(JSON.stringify(respEvent));
+
+}
+
 async function updateActions() {
   for (const action of registeredActions.values()) {
     updateAction(action);
@@ -113,13 +156,7 @@ async function updateAction(eventData) {
       if (!dataStore) return;
 
       //Update name
-      const name = dataStore[`ext/obank/6/ch/${channelIndex}/name`];
-      if (name?.length > 0) {
-        actionTitle = name;
-      } else {
-        const defaultName = dataStore[`ext/obank/6/ch/${channelIndex}/defaultName`];
-        actionTitle = defaultName;
-      }
+      actionTitle = getChannelDisplayName(dataStore, channelIndex);
 
       // Update state
       const muteChannelState = dataStore[`mix/chan/${channelIndex}/matrix/mute`];
@@ -145,6 +182,25 @@ async function updateAction(eventData) {
     }
 
     websocket.send(JSON.stringify(setStateCmd));
+  }
+}
+
+function getChannelDisplayName(dataStore, channelIndex) {
+  const name = dataStore[`ext/obank/6/ch/${channelIndex}/name`];
+  if (name?.length > 0) {
+    const chFormat = dataStore[`mix/chan/${channelIndex}/config/format`];
+    if (chFormat === "2:0") {
+      const suffixRegEx = /(.*) L$/;
+      const match = suffixRegEx.exec(name);
+      if (match?.length > 0) {
+        return match[1];
+      }
+      return name;
+    }
+    return name;
+  } else {
+    const defaultName = dataStore[`ext/obank/6/ch/${channelIndex}/defaultName`];
+    return defaultName;
   }
 }
 
@@ -181,8 +237,12 @@ function connectElgatoStreamDeckSocket(port, uuid, messageType, appInfoString, a
 
         break;
       case 'sendToPlugin':
-        if (eventData.payload && eventData.payload.event === 'getMotuDevices') {
-          getMotuDevices(eventData);
+        if (eventData.payload) {
+          if (eventData.payload.event === 'getMotuDevices') {
+            getMotuDevices(eventData);
+          } else if (eventData.payload.event === 'getChannels') {
+            getChannels(eventData);
+          }
         }
         break;
       case 'willAppear':
