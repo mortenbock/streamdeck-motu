@@ -11,7 +11,8 @@ const motuApiSettings = {
 const deviceLists = {};
 
 // Generate random client id on startup
-const motuClientId = Math.floor(Math.random() * (Math.pow(2, 31) - 1));
+const motuClientReaderId = Math.floor(Math.random() * (Math.pow(2, 31) - 1));
+const motuClientWriterId = motuClientReaderId + 1;
 
 // Cached datastores for the known devices
 const deviceDataStores = {};
@@ -22,17 +23,38 @@ const registeredActions = new Map();
 // Utility to allow an async function to sleep. Used like: await sleep(1000)
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
+function getDeviceCacheKey() {
+  if (!(motuApiSettings.host && motuApiSettings.port && motuApiSettings.device)) {
+    console.log('Api settings not complete', motuApiSettings);
+    return;
+  }
+
+  return `${motuApiSettings.host}_${motuApiSettings.port}_${motuApiSettings.device}_${motuClientReaderId}`
+}
+
+function getDataStoreEndpoint(clientId) {
+  if (!(motuApiSettings.host && motuApiSettings.port && motuApiSettings.device)) {
+    console.log('Api settings not complete', motuApiSettings);
+    return;
+  }
+
+  const endpoint = `http://${motuApiSettings.host}:${motuApiSettings.port}/${motuApiSettings.device}/datastore?client=${clientId}`;
+
+  return endpoint;
+}
+
 async function pollWorker() {
   let dataStoreEndpoint = '';
   let etag = undefined;
 
   while (true) {
-    if (!(motuApiSettings.host && motuApiSettings.port && motuApiSettings.device)) {
-      console.log('Api settings not complete', motuApiSettings);
+    const deviceCacheKey = getDeviceCacheKey();
+    if (!deviceCacheKey) {
       await sleep(5000);
       continue;
     }
-    let currentDataStoreEndpoint = `http://${motuApiSettings.host}:${motuApiSettings.port}/${motuApiSettings.device}/datastore?client=${motuClientId}`;
+
+    let currentDataStoreEndpoint = getDataStoreEndpoint(motuClientReaderId);
 
     // If the endpoint changed, reset the values
     if (currentDataStoreEndpoint != dataStoreEndpoint) {
@@ -49,10 +71,10 @@ async function pollWorker() {
         etag = dataStorePollResponse.headers.get('ETag');
         const dataStorePayload = await dataStorePollResponse.json();
 
-        if (deviceDataStores[dataStoreEndpoint] === undefined) {
-          deviceDataStores[dataStoreEndpoint] = dataStorePayload;
+        if (deviceDataStores[deviceCacheKey] === undefined) {
+          deviceDataStores[deviceCacheKey] = dataStorePayload;
         } else {
-          Object.assign(deviceDataStores[dataStoreEndpoint], dataStorePayload);
+          Object.assign(deviceDataStores[deviceCacheKey], dataStorePayload);
         }
 
         updateActions();
@@ -64,15 +86,21 @@ async function pollWorker() {
   }
 }
 
-async function getMotuDevices(eventData) {
-
+async function populateDeviceListCache(isRefresh){
   const deviceCacheKey = `${motuApiSettings.host}_${motuApiSettings.port}`
   let deviceArray = deviceLists[deviceCacheKey];
-  if (eventData.payload.isRefresh || deviceArray === undefined || deviceArray.length < 1) {
+  if (isRefresh || deviceArray === undefined || deviceArray.length < 1) {
     const res = await fetch(`http://${motuApiSettings.host}:${motuApiSettings.port}/connected_devices`);
     deviceArray = await res.json();
     deviceLists[deviceCacheKey] = deviceArray;
   }
+
+  return deviceArray;
+}
+
+async function getMotuDevices(eventData) {
+
+  let deviceArray = await populateDeviceListCache(eventData.payload.isRefresh);
 
   const piItems = [];
   for (let index = 0; index < deviceArray.length; index++) {
@@ -98,9 +126,7 @@ async function getMotuDevices(eventData) {
  * Get list of channels to be selected by the user
  */
 async function getChannels(eventData) {
-  console.log('getChannels', eventData);
-  const dataStoreEndpoint = `http://${motuApiSettings.host}:${motuApiSettings.port}/${motuApiSettings.device}/datastore?client=${motuClientId}`;
-  const dataStore = deviceDataStores[dataStoreEndpoint];
+  const dataStore = deviceDataStores[getDeviceCacheKey()];
 
   const piItems = [];
 
@@ -151,8 +177,7 @@ async function updateAction(eventData) {
     if (channelIndex === undefined || channelIndex === null || channelIndex === '') {
       actionTitle = 'N/A'
     } else {
-      const dataStoreEndpoint = `http://${motuApiSettings.host}:${motuApiSettings.port}/${motuApiSettings.device}/datastore?client=${motuClientId}`;
-      const dataStore = deviceDataStores[dataStoreEndpoint];
+      const dataStore = deviceDataStores[getDeviceCacheKey()];
       if (!dataStore) return;
 
       //Update name
@@ -235,6 +260,8 @@ function connectElgatoStreamDeckSocket(port, uuid, messageType, appInfoString, a
         const device = eventData?.payload?.settings?.motuapi?.device
         motuApiSettings.device = device;
 
+        populateDeviceListCache(true);
+        updateActions();
         break;
       case 'sendToPlugin':
         if (eventData.payload) {
@@ -253,7 +280,7 @@ function connectElgatoStreamDeckSocket(port, uuid, messageType, appInfoString, a
       case 'willDisappear':
         registeredActions.delete(eventData.context);
         break;
-      case 'keyDown':
+      case 'keyUp':
         if (eventData.action === 'com.bocktown.motu.mute') {
           const formData = new URLSearchParams();
 
@@ -262,10 +289,6 @@ function connectElgatoStreamDeckSocket(port, uuid, messageType, appInfoString, a
             //Channel not set up. Don't do anything.
             break;
           }
-          const dataStoreEndpoint = `http://${motuApiSettings.host}:${motuApiSettings.port}/${motuApiSettings.device}/datastore?client=${motuClientId}`;
-          const dataStore = deviceDataStores[dataStoreEndpoint];
-          // If datastore is not initialized, exit.
-          if (!dataStore) break;
 
           const dataStoreKey = `mix/chan/${channelIndex}/matrix/mute`;
           const muteDataStoreTargetValue = eventData.payload.state === 0 ? 1 : 0;
@@ -276,14 +299,10 @@ function connectElgatoStreamDeckSocket(port, uuid, messageType, appInfoString, a
           const muteCmdJson = JSON.stringify(muteCmd);
           formData.append('json', muteCmdJson);
 
+          const dataStoreEndpoint = getDataStoreEndpoint(motuClientWriterId);
           fetch(dataStoreEndpoint, {
             'body': formData,
             'method': 'POST'
-          }).then((r) => {
-            if (r.status === 204) {
-              // API call went well, update local data store.
-              dataStore[dataStoreKey] = muteDataStoreTargetValue;
-            }
           });
         }
         break;
