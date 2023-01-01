@@ -74,7 +74,7 @@
     "Description": "Lets you control your MOTU device",
     "Name": "MOTU",
     "Icon": "motuicon",
-    "URL": "https://example.com/todo",
+    "URL": "https://github.com/mortenbock/streamdeck-motu",
     "Version": "1.0.0",
     "OS": [
         {
