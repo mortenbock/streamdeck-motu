@@ -1,0 +1,35 @@
+<head>
+  <meta charset="utf-8" />
+  <title>My Property Inspector</title>
+  <script src="../libs/sdpi-components.js"></script>
+  <style>
+    fieldset {
+      border-color: #969696;
+    }
+
+    fieldset legend {
+      color: #969696;
+      font-family: "Segoe UI", Arial, Roboto, Helvetica sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+    }
+  </style>
+</head>
+
+<body>
+  <fieldset>
+    <legend>Global api settings</legend>
+    <sdpi-item label="Host">
+      <sdpi-textfield setting="motuapi.host" global="true" placeholder="localhost"></sdpi-textfield>
+    </sdpi-item>
+    <sdpi-item label="Port">
+      <sdpi-textfield setting="motuapi.port" global="true" placeholder="1280"></sdpi-textfield>
+    </sdpi-item>
+    <sdpi-item label="Device">
+      <sdpi-select setting="motuapi.device" placeholder="Please select device"
+        global="true"
+        datasource="getMotuDevices" 
+        loading="Fetching devices..." 
+        show-refresh="true" 
+        hot-reload="true"></sdpi-select>
+    </sdpi-item>
+  </fieldset>
+</body>

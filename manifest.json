@@ -1,16 +1,16 @@
 {
     "Actions": [
         {
-            "Icon": "muted",
-            "Name": "Mute",
+            "Icon": "mutedicon",
+            "Name": "Mute channel",
             "States": [
                 {
-                    "Image": "unmuted",
+                    "Image": "unmutedkey",
                     "TitleAlignment": "bottom",
                     "FontSize": "10"
                 },
                 {
-                    "Image": "muted",
+                    "Image": "mutedkey",
                     "TitleAlignment": "bottom",
                     "FontSize": "10",
                     "TitleColor": "#FF0000"
@@ -18,8 +18,54 @@
             ],
             "SupportedInMultiActions": false,
             "Tooltip": "Mute a mixer channel",
-            "UUID": "com.bocktown.motu.mute",
-            "PropertyInspectorPath": "pi/pi.html"
+            "UUID": "com.bocktown.motu.mute.channel",
+            "PropertyInspectorPath": "pi/pi_mute_channel.html"
+        },
+        {
+            "Icon": "mutedicon",
+            "Name": "Mute monitor",
+            "States": [
+                {
+                    "Image": "unmutedkey",
+                    "TitleAlignment": "bottom",
+                    "FontSize": "10",
+                    "Title": "Monitor"
+                },
+                {
+                    "Image": "mutedkey",
+                    "TitleAlignment": "bottom",
+                    "FontSize": "10",
+                    "TitleColor": "#FF0000",
+                    "Title": "Monitor"
+                }
+            ],
+            "SupportedInMultiActions": false,
+            "Tooltip": "Mute the monitor output",
+            "UUID": "com.bocktown.motu.mute.monitor",
+            "PropertyInspectorPath": "pi/pi_global.html"
+        },
+        {
+            "Icon": "mutedicon",
+            "Name": "Mute main",
+            "States": [
+                {
+                    "Image": "unmutedkey",
+                    "TitleAlignment": "bottom",
+                    "FontSize": "10",
+                    "Title": "Main"
+                },
+                {
+                    "Image": "mutedkey",
+                    "TitleAlignment": "bottom",
+                    "FontSize": "10",
+                    "TitleColor": "#FF0000",
+                    "Title": "Main"
+                }
+            ],
+            "SupportedInMultiActions": false,
+            "Tooltip": "Mute the main output",
+            "UUID": "com.bocktown.motu.mute.main",
+            "PropertyInspectorPath": "pi/pi_global.html"
         }
     ],
     "SDKVersion": 2,
@@ -27,7 +73,7 @@
     "CodePath": "app.html",
     "Description": "Lets you control your MOTU device",
     "Name": "MOTU",
-    "Icon": "icon",
+    "Icon": "motuicon",
     "URL": "https://example.com/todo",
     "Version": "1.0.0",
     "OS": [

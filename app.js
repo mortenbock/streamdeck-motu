@@ -86,7 +86,7 @@ async function pollWorker() {
   }
 }
 
-async function populateDeviceListCache(isRefresh){
+async function populateDeviceListCache(isRefresh) {
   const deviceCacheKey = `${motuApiSettings.host}_${motuApiSettings.port}`
   let deviceArray = deviceLists[deviceCacheKey];
   if (isRefresh || deviceArray === undefined || deviceArray.length < 1) {
@@ -169,44 +169,83 @@ async function updateActions() {
 }
 
 async function updateAction(eventData) {
-  if (eventData.action === 'com.bocktown.motu.mute') {
-    const channelIndex = eventData?.payload?.settings?.mixerChannelIndex;
-    let actionTitle = '?';
-    let actionState = 0;
+  switch (eventData.action) {
+    case 'com.bocktown.motu.mute.channel': {
+      const channelIndex = eventData?.payload?.settings?.mixerChannelIndex;
+      let actionTitle = '?';
+      let actionState = 0;
 
-    if (channelIndex === undefined || channelIndex === null || channelIndex === '') {
-      actionTitle = 'N/A'
-    } else {
+      if (channelIndex === undefined || channelIndex === null || channelIndex === '') {
+        actionTitle = 'N/A'
+      } else {
+        const dataStore = deviceDataStores[getDeviceCacheKey()];
+        if (!dataStore) return;
+
+        //Update name
+        actionTitle = getChannelDisplayName(dataStore, channelIndex);
+
+        // Update state
+        const muteChannelState = dataStore[`mix/chan/${channelIndex}/matrix/mute`];
+        actionState = muteChannelState === 1 ? 1 : 0;
+      }
+
+      const setTitleCmd = {
+        'event': 'setTitle',
+        'context': eventData.context,
+        'payload': {
+          'title': actionTitle
+        }
+      };
+
+      websocket.send(JSON.stringify(setTitleCmd));
+
+      const setStateCmd = {
+        'event': 'setState',
+        'context': eventData.context,
+        'payload': {
+          'state': actionState
+        }
+      }
+
+      websocket.send(JSON.stringify(setStateCmd));
+      break;
+    }
+    case 'com.bocktown.motu.mute.monitor': {
       const dataStore = deviceDataStores[getDeviceCacheKey()];
       if (!dataStore) return;
-
-      //Update name
-      actionTitle = getChannelDisplayName(dataStore, channelIndex);
-
       // Update state
-      const muteChannelState = dataStore[`mix/chan/${channelIndex}/matrix/mute`];
-      actionState = muteChannelState === 1 ? 1 : 0;
-    }
+      const muteChannelState = dataStore['mix/monitor/0/matrix/mute'];
+      const actionState = muteChannelState === 1 ? 1 : 0;
 
-    const setTitleCmd = {
-      'event': 'setTitle',
-      'context': eventData.context,
-      'payload': {
-        'title': actionTitle
+      const setStateCmd = {
+        'event': 'setState',
+        'context': eventData.context,
+        'payload': {
+          'state': actionState
+        }
       }
-    };
 
-    websocket.send(JSON.stringify(setTitleCmd));
-
-    const setStateCmd = {
-      'event': 'setState',
-      'context': eventData.context,
-      'payload': {
-        'state': actionState
-      }
+      websocket.send(JSON.stringify(setStateCmd));
+      break;
     }
+    case 'com.bocktown.motu.mute.main': {
+      const dataStore = deviceDataStores[getDeviceCacheKey()];
+      if (!dataStore) return;
+      // Update state
+      const muteChannelState = dataStore['mix/main/0/matrix/mute'];
+      const actionState = muteChannelState === 1 ? 1 : 0;
 
-    websocket.send(JSON.stringify(setStateCmd));
+      const setStateCmd = {
+        'event': 'setState',
+        'context': eventData.context,
+        'payload': {
+          'state': actionState
+        }
+      }
+
+      websocket.send(JSON.stringify(setStateCmd));
+      break;
+    }
   }
 }
 
@@ -227,6 +266,18 @@ function getChannelDisplayName(dataStore, channelIndex) {
     const defaultName = dataStore[`ext/obank/6/ch/${channelIndex}/defaultName`];
     return defaultName;
   }
+}
+
+async function postDatastoreUpdate(cmdObj) {
+  const cmdJson = JSON.stringify(cmdObj);
+  const formData = new URLSearchParams();
+  formData.append('json', cmdJson);
+
+  const dataStoreEndpoint = getDataStoreEndpoint(motuClientWriterId);
+  return fetch(dataStoreEndpoint, {
+    'body': formData,
+    'method': 'POST'
+  });
 }
 
 /**
@@ -281,29 +332,49 @@ function connectElgatoStreamDeckSocket(port, uuid, messageType, appInfoString, a
         registeredActions.delete(eventData.context);
         break;
       case 'keyUp':
-        if (eventData.action === 'com.bocktown.motu.mute') {
-          const formData = new URLSearchParams();
 
-          const channelIndex = eventData?.payload?.settings?.mixerChannelIndex;
-          if (channelIndex === undefined || channelIndex === null || channelIndex === '') {
-            //Channel not set up. Don't do anything.
+        switch (eventData.action) {
+          case 'com.bocktown.motu.mute.channel': {
+            const channelIndex = eventData?.payload?.settings?.mixerChannelIndex;
+            if (channelIndex === undefined || channelIndex === null || channelIndex === '') {
+              //Channel not set up. Don't do anything.
+              break;
+            }
+
+            const dataStoreKey = `mix/chan/${channelIndex}/matrix/mute`;
+            const muteDataStoreTargetValue = eventData.payload.state === 0 ? 1 : 0;
+
+            const muteCmd = {};
+            muteCmd[dataStoreKey] = muteDataStoreTargetValue;
+
+            postDatastoreUpdate(muteCmd);
+
             break;
           }
+          case 'com.bocktown.motu.mute.monitor': {
+            const dataStoreKey = 'mix/monitor/0/matrix/mute';
+            const muteDataStoreTargetValue = eventData.payload.state === 0 ? 1 : 0;
 
-          const dataStoreKey = `mix/chan/${channelIndex}/matrix/mute`;
-          const muteDataStoreTargetValue = eventData.payload.state === 0 ? 1 : 0;
+            const muteCmd = {};
+            muteCmd[dataStoreKey] = muteDataStoreTargetValue;
 
-          const muteCmd = {};
-          muteCmd[dataStoreKey] = muteDataStoreTargetValue;
+            postDatastoreUpdate(muteCmd);
 
-          const muteCmdJson = JSON.stringify(muteCmd);
-          formData.append('json', muteCmdJson);
+            break;
+          }
+          case 'com.bocktown.motu.mute.main': {
+            const dataStoreKey = 'mix/main/0/matrix/mute';
+            const muteDataStoreTargetValue = eventData.payload.state === 0 ? 1 : 0;
 
-          const dataStoreEndpoint = getDataStoreEndpoint(motuClientWriterId);
-          fetch(dataStoreEndpoint, {
-            'body': formData,
-            'method': 'POST'
-          });
+            const muteCmd = {};
+            muteCmd[dataStoreKey] = muteDataStoreTargetValue;
+
+            postDatastoreUpdate(muteCmd);
+
+            break;
+          }
+          default:
+            break;
         }
         break;
       default:
