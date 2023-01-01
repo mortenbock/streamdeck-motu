@@ -103,12 +103,16 @@ async function updateAction(eventData) {
   if (eventData.action === 'com.bocktown.motu.mute') {
     const channelIndex = eventData?.payload?.settings?.mixerChannelIndex;
     let actionTitle = '?';
+    let actionState = 0;
+
     if (channelIndex === undefined || channelIndex === null || channelIndex === '') {
       actionTitle = 'N/A'
     } else {
       const dataStoreEndpoint = `http://${motuApiSettings.host}:${motuApiSettings.port}/${motuApiSettings.device}/datastore?client=${motuClientId}`;
       const dataStore = deviceDataStores[dataStoreEndpoint];
       if (!dataStore) return;
+
+      //Update name
       const name = dataStore[`ext/obank/6/ch/${channelIndex}/name`];
       if (name?.length > 0) {
         actionTitle = name;
@@ -116,6 +120,10 @@ async function updateAction(eventData) {
         const defaultName = dataStore[`ext/obank/6/ch/${channelIndex}/defaultName`];
         actionTitle = defaultName;
       }
+
+      // Update state
+      const muteChannelState = dataStore[`mix/chan/${channelIndex}/matrix/mute`];
+      actionState = muteChannelState === 1 ? 1 : 0;
     }
 
     const setTitleCmd = {
@@ -127,6 +135,16 @@ async function updateAction(eventData) {
     };
 
     websocket.send(JSON.stringify(setTitleCmd));
+
+    const setStateCmd = {
+      'event': 'setState',
+      'context': eventData.context,
+      'payload': {
+        'state': actionState
+      }
+    }
+
+    websocket.send(JSON.stringify(setStateCmd));
   }
 }
 
@@ -184,16 +202,28 @@ function connectElgatoStreamDeckSocket(port, uuid, messageType, appInfoString, a
             //Channel not set up. Don't do anything.
             break;
           }
+          const dataStoreEndpoint = `http://${motuApiSettings.host}:${motuApiSettings.port}/${motuApiSettings.device}/datastore?client=${motuClientId}`;
+          const dataStore = deviceDataStores[dataStoreEndpoint];
+          // If datastore is not initialized, exit.
+          if (!dataStore) break;
+
+          const dataStoreKey = `mix/chan/${channelIndex}/matrix/mute`;
+          const muteDataStoreTargetValue = eventData.payload.state === 0 ? 1 : 0;
 
           const muteCmd = {};
-          muteCmd[`mix/chan/${channelIndex}/matrix/mute`] = 1;
+          muteCmd[dataStoreKey] = muteDataStoreTargetValue;
 
           const muteCmdJson = JSON.stringify(muteCmd);
           formData.append('json', muteCmdJson);
 
-          fetch(`http://${motuApiSettings.host}:${motuApiSettings.port}/${motuApiSettings.device}/datastore?client=${motuClientId}`, {
+          fetch(dataStoreEndpoint, {
             'body': formData,
             'method': 'POST'
+          }).then((r) => {
+            if (r.status === 204) {
+              // API call went well, update local data store.
+              dataStore[dataStoreKey] = muteDataStoreTargetValue;
+            }
           });
         }
         break;

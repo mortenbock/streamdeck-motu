@@ -1,13 +1,19 @@
 {
     "Actions": [
         {
-            "Icon": "mute",
+            "Icon": "muted",
             "Name": "Mute",
             "States": [
                 {
-                    "Image": "mute",
+                    "Image": "unmuted",
                     "TitleAlignment": "bottom",
-                    "FontSize": "12"
+                    "FontSize": "10"
+                },
+                {
+                    "Image": "muted",
+                    "TitleAlignment": "bottom",
+                    "FontSize": "10",
+                    "TitleColor": "#FF0000"
                 }
             ],
             "SupportedInMultiActions": false,

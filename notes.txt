@@ -28,3 +28,11 @@ ext/obank/6/ch/0/src: "0:0"
 ext/obank/6/ch/4/defaultName: "In 5"
 ext/obank/6/ch/4/name: "From System L"
 ext/obank/6/ch/4/src: "4:0"
+
+
+// Mute state:
+
+mix/chan/1/matrix/mute: 1
+mix/group/0/matrix/mute: 0
+mix/main/0/matrix/mute: 0
+mix/monitor/0/matrix/mute: 0
